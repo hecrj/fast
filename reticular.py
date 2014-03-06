@@ -1,3 +1,10 @@
+"""
+Reticular is a lightweight Python module that can be used to create powerful command-line tools.
+It lets you define commands easily, without losing flexibility and control.
+It can handle subcommand groups and supports interactive mode!
+"""
+__author__ = "Héctor Ramón Jiménez, and Alvaro Espuña"
+
 from functools import wraps
 import os
 import sys
@@ -7,7 +14,7 @@ _COMMAND_GROUPS = {}
 
 
 class CLI(object):
-    def __init__(self, message='Welcome!', directory='.', package='commands'):
+    def __init__(self, version, message='Welcome!', directory='.', package='commands'):
         self.message = message
         self.directory = directory
         self.groups = {}
@@ -23,6 +30,7 @@ class CLI(object):
         try:
             self.base = self.groups.pop('base')
             self.base.load()
+            self.base.parser.add_argument('--version', action='version', version=version)
         except KeyError:
             raise RuntimeError('Base commands module not found in: %s.base' % package)
 
@@ -36,7 +44,6 @@ class CLI(object):
                 return self.interactive()
 
         try:
-            os.chdir(self.directory)
             parsed_args = self.base.parser.parse_args(args)
             parsed_args = vars(parsed_args)
             func = parsed_args.pop('func')

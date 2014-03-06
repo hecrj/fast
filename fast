@@ -10,4 +10,8 @@ _  __/ / /_/ /_(__  )/ /_
 
 Welcome! Use -h or --help to see command help.'''
 
-reticular.CLI(message=message, directory=os.path.normpath(os.path.dirname(__file__))).run()
+reticular.CLI(
+    version='0.0.1',
+    message=message,
+    directory=os.path.normpath(os.path.dirname(__file__))
+).run()
