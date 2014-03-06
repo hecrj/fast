@@ -23,19 +23,27 @@ def benchmark(prog_file):
     ]
 
     for executable in executables:
-        stats(executable)
+        stats(executable, 20)
 
 
 @argument('executable', help='Executable file')
+@argument('-a', '--arg', help='Defines an argument to pass to the executable', action='append')
+@argument('-c', '--cases', help='Number of cases', default=20, type=int)
+@argument('-e', '--executions', help='Number of executions per case', default=1)
 @argument('-q', '--quiet', help="Don't print the stats table", action='store_true')
-def stats(executable, quiet=False, executions=3, decimals_min=500, decimals_max=10000, step=500):
+def stats(executable, arg=None, cases=20, executions=1, quiet=False):
     name, ext = os.path.splitext(executable)
+
+    if arg is None:
+        arg = []
 
     print "Generating stats for %s..." % executable
     with open("%s.stats" % name, 'w') as f:
-        for decimals in xrange(decimals_min, decimals_max+1, step):
-            times = [run(executable, decimals) for i in xrange(executions)]
-            row = "%d %.4f\n" % (decimals, sum(times)/executions)
+        for i in xrange(1, cases+1):
+            args = [eval(a) for a in arg]
+            times = [run(executable, *args) for _ in xrange(executions)]
+            row_id = args[0] if args else i
+            row = "%d %.4f\n" % (row_id, sum(times)/executions)
 
             f.write(row)
 
@@ -90,6 +98,9 @@ def run(exe, *args):
 
     process = subprocess.Popen(cmd, stdout=open("/dev/null"), stderr=subprocess.PIPE)
     out, err = process.communicate()
+
+    if process.returncode:
+        raise RuntimeError("Error when executing %s with args: %s" % (exe, args))
 
     elapsed = float(re.search(r'fast\|(\d+\.\d+)\|fast', err).group(1))
     return elapsed
