@@ -2,32 +2,39 @@
 A command-line tool to test the optimizations performed to a program
 """
 import os
+import re
 import sys
-import time
 import subprocess
-from reticular import argument, command
+from reticular import argument
 
 
-@argument('prog_file', help='File of the program to test')
+@argument('prog_file', help='File of the program to benchmark')
 def benchmark(prog_file):
     """
-    Benchmark execution time of a program
+    Compiles with O0, O1 and O3 and
     """
     if not os.path.isfile(prog_file):
         raise RuntimeError('File not found: %s' % prog_file)
 
-    compile(prog_file, out="o0.exe")
-    compile(prog_file, olevel=1, out="o1.exe")
-    compile(prog_file, olevel=3, native=True, out="o3.exe")
+    executables = [
+        compile(prog_file),
+        compile(prog_file, olevel=1),
+        compile(prog_file, olevel=3, native=True)
+    ]
 
-    with open('o0.stats', 'w') as f:
-        execute("o0.exe", 3, statsfile=f)
+    for executable in executables:
+        stats(executable)
 
-    with open('o1.stats', 'w') as f:
-        execute("o1.exe", 3, statsfile=f)
 
-    with open('o3.stats', 'w') as f:
-        execute("o3.exe", 3, statsfile=f)
+@argument('executable', help='Executable file')
+@argument('-q', '--quiet', help="Don't print the stats table", action='store_true')
+def stats(executable, quiet=False, executions=3, decimals_min=500, decimals_max=10000, step=500):
+    name, ext = os.path.splitext(executable)
+
+    print "Generating stats for %s..." % executable
+    with open("%s.stats" % name, 'w') as f:
+        generate_stats(executable, executions, quiet=quiet, statsfile=f, NMIN=decimals_min, NMAX=decimals_max,
+                       NSTEP=step)
 
 
 @argument('-s', '--stats', help='Clean .stats files', action='store_true')
@@ -47,8 +54,12 @@ def clean(stats):
         print 'Removed: %s' % f
 
 
-def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, native=False, out='_exec'):
+def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, native=False, out=None):
     cmd = [compiler, '-O%d' % olevel]
+
+    if out is None:
+        prog_name, ext = os.path.splitext(source)
+        out = "%s_o%d.exe" % (prog_name, olevel)
 
     if debug:
         cmd.append('-g')
@@ -60,24 +71,36 @@ def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, nati
     cmd.extend(['-o', out])
     cmd.append(source)
 
-    ret = subprocess.call(cmd)
-    return ret == 0
+    print "Compiling %s..." % source
+    if subprocess.call(cmd):
+        raise RuntimeError("Error when compiling: %s" % source)
+
+    return out
 
 
 def run(exe, *args):
-    cmd = ["./%s"%exe]
+    cmd = ['time', '-f', 'fast|%e|fast', "./%s" % exe]
     cmd.extend(map(str, args))
 
-    start = time.time()
-    subprocess.call(cmd, stdout=open("/dev/null"))
-    elapsed = time.time() - start
-    # TODO: Check correctness of output
+    process = subprocess.Popen(cmd, stdout=open("/dev/null"), stderr=subprocess.PIPE)
+    out, err = process.communicate()
+
+    elapsed = float(re.search(r'fast\|(\d+\.\d+)\|fast', err).group(1))
+    
     return elapsed
 
 
-def execute(exe, NEXEC, NMIN=500, NMAX=10000, NSTEP=500, statsfile=sys.stdout):
+def generate_stats(exe, NEXEC, statsfile=None, NMIN=500, NMAX=10000, NSTEP=500, quiet=False):
     for decimals in xrange(NMIN, NMAX+1, NSTEP):
         times = []
+
         for i in xrange(NEXEC):
             times.append(run(exe, decimals))
-        statsfile.write("%d %.4f\n" % (decimals, sum(times)/NEXEC))
+
+        row = "%d %.4f\n" % (decimals, sum(times)/NEXEC)
+
+        if statsfile:
+            statsfile.write(row)
+
+        if not quiet:
+            sys.stdout.write(row)
