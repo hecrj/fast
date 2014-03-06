@@ -72,6 +72,7 @@ class CLI(object):
     def load_all(self):
         for name, cmd_group in self.groups.iteritems():
             cmd_group.register(self.base.parser_generator)
+            cmd_group.populate()
 
     @staticmethod
     def list(directory, package):
@@ -84,7 +85,6 @@ class CommandGroup(object):
         self.name = path.split('.')[-1]
         self.path = path
         self._module = None
-        self.global_args = None
         self.parser = None
         self.parser_generator = None
         self.parsers = {}
@@ -97,7 +97,6 @@ class CommandGroup(object):
             metavar = '<command>' if subcommand else '<base_command>'
             self.parser = DefaultHelpParser(add_help=add_help, prog=sys.argv[0]+prog)
             self.parser_generator = self.parser.add_subparsers(title=title, metavar=metavar)
-
             self.__import()
 
     def register(self, subparsers):
@@ -106,11 +105,11 @@ class CommandGroup(object):
 
     def __import(self):
         self._module = __import__(self.path, fromlist=[self.name])
-        self.global_args = getattr(self._module, 'ARGUMENTS', [])
         self.parser.description = self._module.__doc__
 
+    def populate(self):
         for cmd, parser in self.parsers.iteritems():
-            for args, kwargs in self.global_args:
+            for args, kwargs in getattr(self._module, 'ARGUMENTS', []):
                 parser.add_argument(*args, **kwargs)
 
 
