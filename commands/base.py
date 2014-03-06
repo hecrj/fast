@@ -92,5 +92,4 @@ def run(exe, *args):
     out, err = process.communicate()
 
     elapsed = float(re.search(r'fast\|(\d+\.\d+)\|fast', err).group(1))
-
     return elapsed

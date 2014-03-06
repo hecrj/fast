@@ -4,7 +4,7 @@ Reticular is a lightweight Python module that can be used to create powerful com
 It lets you define commands easily, without losing flexibility and control.
 It can handle subcommand groups and supports interactive mode!
 """
-__author__ = "Héctor Ramón Jiménez, and Alvaro Espuña"
+__author__ = "Héctor Ramón Jiménez, and Alvaro Espuña Buxo"
 
 from functools import wraps
 import os
