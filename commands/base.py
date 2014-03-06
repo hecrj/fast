@@ -2,7 +2,7 @@ import os
 import sys
 import time
 import subprocess
-from reticular import argument
+from reticular import argument, command
 
 
 @argument('prog_file', help='File of the program to test')
@@ -25,6 +25,23 @@ def benchmark(prog_file):
 
     with open('o3.stats', 'w') as f:
         execute("o3.exe", 3, statsfile=f)
+
+
+@argument('-s', '--stats', help='Clean .stats files', action='store_true')
+def clean(stats):
+    """
+    Cleans fast-generated files of the current directory
+    """
+    ends = ['.exe']
+
+    if stats:
+        ends.append('.stats')
+
+    remove_files = (f for f in os.listdir('.') if os.path.splitext(f)[-1] in ends)
+
+    for f in remove_files:
+        os.remove(f)
+        print 'Removed: %s' % f
 
 
 def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, native=False, out='_exec'):
