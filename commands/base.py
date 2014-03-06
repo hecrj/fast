@@ -4,7 +4,6 @@ A command-line tool to test the optimizations performed to a program
 import os
 import subprocess
 from reticular import argument
-from benchmark import stats
 
 
 @argument('-s', '--stats', help='Clean .stats files', action='store_true')

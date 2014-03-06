@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from reticular import argument, global_arg
+from base import compile
 
 ARGUMENTS = [
     global_arg('-a', '--arg', help='Defines an argument to pass to the executable', action='append'),
