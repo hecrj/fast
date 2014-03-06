@@ -31,6 +31,7 @@ class CLI(object):
         try:
             self.base = self.groups.pop('base')
             self.base.load(subcommand=False)
+            self.base.populate()
             self.base.parser.add_argument('--version', action='version', version=version)
         except KeyError:
             raise RuntimeError('Base commands module not found in: %s.base' % package)
@@ -71,8 +72,9 @@ class CLI(object):
 
     def load_all(self):
         for name, cmd_group in self.groups.iteritems():
-            cmd_group.register(self.base.parser_generator)
+            cmd_group.load()
             cmd_group.populate()
+            cmd_group.register(self.base.parser_generator)
 
     @staticmethod
     def list(directory, package):
@@ -97,17 +99,15 @@ class CommandGroup(object):
             metavar = '<command>' if subcommand else '<base_command>'
             self.parser = DefaultHelpParser(add_help=add_help, prog=sys.argv[0]+prog)
             self.parser_generator = self.parser.add_subparsers(title=title, metavar=metavar)
-            self.__import()
+            self._module = __import__(self.path, fromlist=[self.name])
 
     def register(self, subparsers):
-        self.load()
-        subparsers.add_parser(self.name, parents=[self.parser], help=self._module.__doc__)
-
-    def __import(self):
-        self._module = __import__(self.path, fromlist=[self.name])
-        self.parser.description = self._module.__doc__
+        subparsers.add_parser(self.name, parents=[self.parser], help=self.parser.description,
+                              description=self.parser.description)
 
     def populate(self):
+        self.parser.description = self._module.__doc__
+
         for cmd, parser in self.parsers.iteritems():
             for args, kwargs in getattr(self._module, 'ARGUMENTS', []):
                 parser.add_argument(*args, **kwargs)
