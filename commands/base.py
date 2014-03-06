@@ -1,3 +1,6 @@
+"""
+A command-line tool to test the optimizations performed to a program
+"""
 import os
 import sys
 import time
