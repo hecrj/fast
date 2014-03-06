@@ -33,8 +33,14 @@ def stats(executable, quiet=False, executions=3, decimals_min=500, decimals_max=
 
     print "Generating stats for %s..." % executable
     with open("%s.stats" % name, 'w') as f:
-        generate_stats(executable, executions, quiet=quiet, statsfile=f, NMIN=decimals_min, NMAX=decimals_max,
-                       NSTEP=step)
+        for decimals in xrange(decimals_min, decimals_max+1, step):
+            times = [run(executable, decimals) for i in xrange(executions)]
+            row = "%d %.4f\n" % (decimals, sum(times)/executions)
+
+            f.write(row)
+
+            if not quiet:
+                sys.stdout.write(row)
 
 
 @argument('-s', '--stats', help='Clean .stats files', action='store_true')
@@ -86,21 +92,5 @@ def run(exe, *args):
     out, err = process.communicate()
 
     elapsed = float(re.search(r'fast\|(\d+\.\d+)\|fast', err).group(1))
-    
+
     return elapsed
-
-
-def generate_stats(exe, NEXEC, statsfile=None, NMIN=500, NMAX=10000, NSTEP=500, quiet=False):
-    for decimals in xrange(NMIN, NMAX+1, NSTEP):
-        times = []
-
-        for i in xrange(NEXEC):
-            times.append(run(exe, decimals))
-
-        row = "%d %.4f\n" % (decimals, sum(times)/NEXEC)
-
-        if statsfile:
-            statsfile.write(row)
-
-        if not quiet:
-            sys.stdout.write(row)
