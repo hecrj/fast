@@ -84,6 +84,7 @@ class CommandGroup(object):
         self.name = path.split('.')[-1]
         self.path = path
         self._module = None
+        self.global_args = []
         self.parser = None
         self.parser_generator = None
         self.parsers = {}
@@ -136,6 +137,10 @@ def command(f):
     return f
 
 
+def global_arg(*args, **kwargs):
+    _current_group.global_args.append((args, kwargs))
+
+
 def _get_parser(f):
     """
     Gets the parser for the command f, if it not exists it creates a new one
@@ -143,6 +148,10 @@ def _get_parser(f):
     if f.__name__ not in _COMMAND_GROUPS[f.__module__].parsers:
         parser = _current_group.parser_generator.add_parser(f.__name__, help=f.__doc__, description=f.__doc__)
         parser.set_defaults(func=f)
+
+        for args, kwargs in _current_group.global_args:
+            parser.add_argument(*args, **kwargs)
+
         _COMMAND_GROUPS[f.__module__].parsers[f.__name__] = parser
 
     return _COMMAND_GROUPS[f.__module__].parsers[f.__name__]
