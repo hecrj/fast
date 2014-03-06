@@ -7,10 +7,11 @@ import subprocess
 import sys
 from reticular import argument, global_arg
 
-
-global_arg('-a', '--arg', help='Defines an argument to pass to the executable', action='append')
-global_arg('-c', '--cases', help='Number of cases (default: %(default)s)', default=20, type=int)
-global_arg('-e', '--executions', help='Number of executions per case (default: %(default)s)', default=1)
+ARGUMENTS = [
+    global_arg('-a', '--arg', help='Defines an argument to pass to the executable', action='append'),
+    global_arg('-c', '--cases', help='Number of cases (default: %(default)s)', default=20, type=int),
+    global_arg('-e', '--executions', help='Number of executions per case (default: %(default)s)', default=1)
+]
 
 
 @argument('prog_file', help='File of the program to benchmark')
@@ -54,30 +55,6 @@ def stats(executable, arg=None, cases=20, executions=1, quiet=False):
 
             if not quiet:
                 sys.stdout.write(row)
-
-
-def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, native=False, out=None):
-    cmd = [compiler, '-O%d' % olevel]
-
-    if out is None:
-        prog_name, ext = os.path.splitext(source)
-        out = "%s_o%d.exe" % (prog_name, olevel)
-
-    if debug:
-        cmd.append('-g')
-    if profiling:
-        cmd.append('-pg')
-    if native:
-        cmd.append('-march=native')
-
-    cmd.extend(['-o', out])
-    cmd.append(source)
-
-    print "Compiling %s..." % source
-    if subprocess.call(cmd):
-        raise RuntimeError("Error when compiling: %s" % source)
-
-    return out
 
 
 def run(exe, *args):

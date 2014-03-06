@@ -30,7 +30,7 @@ class CLI(object):
 
         try:
             self.base = self.groups.pop('base')
-            self.base.load()
+            self.base.load(subcommand=False)
             self.base.parser.add_argument('--version', action='version', version=version)
         except KeyError:
             raise RuntimeError('Base commands module not found in: %s.base' % package)
@@ -71,7 +71,7 @@ class CLI(object):
 
     def load_all(self):
         for name, cmd_group in self.groups.iteritems():
-            cmd_group.load(self.base.parser_generator)
+            cmd_group.register(self.base.parser_generator)
 
     @staticmethod
     def list(directory, package):
@@ -84,30 +84,34 @@ class CommandGroup(object):
         self.name = path.split('.')[-1]
         self.path = path
         self._module = None
-        self.global_args = []
+        self.global_args = None
         self.parser = None
         self.parser_generator = None
         self.parsers = {}
 
-    def load(self, subparsers=None):
-        if not self._module:
-            add_help = False if subparsers else True
-            prog = ' '+self.name if subparsers else ''
-            title = 'commands' if subparsers else 'base commands'
-            metavar = '<command>' if subparsers else '<base_command>'
-
+    def load(self, subcommand=True):
+        if not self.parser:
+            add_help = False if subcommand else True
+            prog = ' '+self.name if subcommand else ''
+            title = 'commands' if subcommand else 'base commands'
+            metavar = '<command>' if subcommand else '<base_command>'
             self.parser = DefaultHelpParser(add_help=add_help, prog=sys.argv[0]+prog)
             self.parser_generator = self.parser.add_subparsers(title=title, metavar=metavar)
 
-            global _current_group
-            _current_group = self
-            self._module = __import__(self.path, fromlist=[self.name])
-            self.parser.description = self._module.__doc__
+            self.__import()
 
-        if subparsers:
-            subparsers.add_parser(self.name, parents=[self.parser], help=self._module.__doc__)
+    def register(self, subparsers):
+        self.load()
+        subparsers.add_parser(self.name, parents=[self.parser], help=self._module.__doc__)
 
-        return self._module
+    def __import(self):
+        self._module = __import__(self.path, fromlist=[self.name])
+        self.global_args = getattr(self._module, 'ARGUMENTS', [])
+        self.parser.description = self._module.__doc__
+
+        for cmd, parser in self.parsers.iteritems():
+            for args, kwargs in self.global_args:
+                parser.add_argument(*args, **kwargs)
 
 
 class DefaultHelpParser(ArgumentParser):
@@ -138,19 +142,19 @@ def command(f):
 
 
 def global_arg(*args, **kwargs):
-    _current_group.global_args.append((args, kwargs))
+    return args, kwargs
 
 
 def _get_parser(f):
     """
     Gets the parser for the command f, if it not exists it creates a new one
     """
-    if f.__name__ not in _COMMAND_GROUPS[f.__module__].parsers:
-        parser = _current_group.parser_generator.add_parser(f.__name__, help=f.__doc__, description=f.__doc__)
-        parser.set_defaults(func=f)
+    _COMMAND_GROUPS[f.__module__].load()
 
-        for args, kwargs in _current_group.global_args:
-            parser.add_argument(*args, **kwargs)
+    if f.__name__ not in _COMMAND_GROUPS[f.__module__].parsers:
+        parser = _COMMAND_GROUPS[f.__module__].parser_generator.add_parser(f.__name__, help=f.__doc__,
+                                                                           description=f.__doc__)
+        parser.set_defaults(func=f)
 
         _COMMAND_GROUPS[f.__module__].parsers[f.__name__] = parser
 
