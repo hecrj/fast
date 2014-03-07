@@ -3,7 +3,7 @@ A command-line tool to test the optimizations performed to a program
 """
 import os
 import subprocess
-from reticular import argument
+from reticular import argument, say
 
 
 @argument('-s', '--stats', help='Clean .stats files', action='store_true')
@@ -20,7 +20,7 @@ def clean(stats):
 
     for f in remove_files:
         os.remove(f)
-        print 'Removed: %s' % f
+        say('Removed: %s' % f)
 
 
 @argument('source', help='Source file to compile')
@@ -45,7 +45,7 @@ def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, nati
     cmd.extend(['-o', out])
     cmd.append(source)
 
-    print "Compiling %s with %s" % (source, ' '.join(cmd))
+    say("Compiling %s with %s" % (source, ' '.join(cmd)))
     if subprocess.call(cmd, stderr=open('/dev/null')):
         if native:
             print 'warning: native compilation is not supported'

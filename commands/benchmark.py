@@ -1,68 +1,111 @@
 """
 Benchmark commands
 """
+import difflib
 import os
-import re
 import subprocess
 import sys
-from reticular import argument, global_arg
-from base import prepare
+import time
+from reticular import argument, global_arg, say
+from base import compile
 
 ARGUMENTS = [
-    global_arg('-a', '--arg', help='Defines an argument to pass to the executable', action='append'),
+    global_arg('-a', '--arg', help='Defines an argument to pass to the executable', action='append', default=[]),
     global_arg('-c', '--cases', help='Number of cases (default: %(default)s)', default=20, type=int),
     global_arg('-e', '--executions', help='Number of executions per case (default: %(default)s)', default=1)
 ]
 
 
-@argument('prog_file', help='File of the program to benchmark')
-def full(prog_file, **kwargs):
+@argument('original', help='Original source file')
+@argument('optimized', help='Optimized source file', nargs='?')
+def full(original, optimized=None, **kwargs):
     """
     Compiles, checks differences and generates stats and graphs
     """
-    if not os.path.isfile(prog_file):
-        raise RuntimeError('File not found: %s' % prog_file)
+    for prog_file in [original, optimized]:
+        if prog_file:
+            if not os.path.isfile(prog_file):
+                raise RuntimeError('File not found: %s' % prog_file)
 
-    executables = prepare(prog_file)
+    original = compile(original, olevel=3)
 
-    for executable in executables:
-        stats(executable, **kwargs)
+    if optimized:
+        optimized = compile(optimized, olevel=3)
+        diff(original, optimized, **kwargs)
+        stats(optimized, **kwargs)
+
+    stats(original, **kwargs)
 
 
 @argument('executable', help='Executable file')
 @argument('-q', '--quiet', help="Don't print the stats table", action='store_true')
-def stats(executable, arg=None, cases=20, executions=1, quiet=False):
+def stats(executable, quiet=False, executions=1, **kwargs):
     """
     Generates stats with the real time
     """
     name, ext = os.path.splitext(executable)
 
-    if arg is None:
-        arg = []
-
-    print "Generating stats for %s..." % executable
+    say("Generating stats for %s..." % executable)
     with open("%s.stats" % name, 'w') as f:
-        for i in xrange(1, cases+1):
-            args = [eval(a) for a in arg]
-            times = [run(executable, *args) for _ in xrange(executions)]
+        def _stats(i, *args):
+            times = [run(executable, args=args, output=False)[2] for _ in xrange(executions)]
             row_id = args[0] if args else i
             row = "%d %.4f\n" % (row_id, sum(times)/executions)
-
             f.write(row)
 
             if not quiet:
                 sys.stdout.write(row)
 
+        for_each_case(_stats, **kwargs)
 
-def run(exe, *args):
-    cmd = ['time', '-f', 'fast|%e|fast', "./%s" % exe]
+
+@argument('original', help='Original executable')
+@argument('candidate', help='Candidate executable')
+def diff(original, candidate, **kwargs):
+    if original == candidate:
+        say("Candidate is the original. Skipping diff check...")
+        return
+
+    say("Checking differences between %s and %s..." % (original, candidate))
+
+    def _diff(i, *args):
+        out1, _, _ = run(original, args=args)
+        out2, _, _ = run(candidate, args=args)
+
+        differences = ''.join(difflib.unified_diff(out1, out2))
+
+        if differences:
+            print "Showing differences with args: %s" % args
+            print differences
+            raise RuntimeError("Differences detected!")
+
+    for_each_case(_diff, **kwargs)
+
+
+def for_each_case(f, arg=None, cases=20, **kwargs):
+    if arg is None:
+        arg = []
+
+    for i in xrange(1, cases+1):
+        args = [eval(a) for a in arg]
+        f(i, *args)
+
+
+def run(exe, args=None, output=True):
+    if args is None:
+        args = []
+
+    stdout = subprocess.PIPE if output else open('/dev/null')
+
+    cmd = ["./%s" % exe]
     cmd.extend(map(str, args))
 
-    process = subprocess.Popen(cmd, stdout=open("/dev/null"), stderr=subprocess.PIPE)
+    start = time.time()
+    process = subprocess.Popen(cmd, stdout=stdout, stderr=subprocess.PIPE)
     out, err = process.communicate()
+    elapsed = time.time() - start
 
     if process.returncode:
         raise RuntimeError("Error when executing %s with args: %s" % (exe, args))
 
-    elapsed = float(re.search(r'fast\|(\d+\.\d+)\|fast', err).group(1))
-    return elapsed
+    return out, err, elapsed

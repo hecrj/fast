@@ -144,6 +144,11 @@ def global_arg(*args, **kwargs):
     return args, kwargs
 
 
+def say(*args):
+    for s in args:
+        print ">> %s" % s
+
+
 def _get_parser(f):
     """
     Gets the parser for the command f, if it not exists it creates a new one
