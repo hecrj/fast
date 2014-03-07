@@ -6,7 +6,7 @@ import re
 import subprocess
 import sys
 from reticular import argument, global_arg
-from base import compile
+from base import prepare
 
 ARGUMENTS = [
     global_arg('-a', '--arg', help='Defines an argument to pass to the executable', action='append'),
@@ -23,11 +23,7 @@ def full(prog_file, **kwargs):
     if not os.path.isfile(prog_file):
         raise RuntimeError('File not found: %s' % prog_file)
 
-    executables = [
-        compile(prog_file),
-        compile(prog_file, olevel=1),
-        compile(prog_file, olevel=3, native=True)
-    ]
+    executables = prepare(prog_file)
 
     for executable in executables:
         stats(executable, **kwargs)

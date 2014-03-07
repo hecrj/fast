@@ -24,7 +24,11 @@ def clean(stats):
 
 
 @argument('source', help='Source file to compile')
+@argument('-c', '--compiler', help='The compiler to use (default %(default)s)', default='gcc')
 def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, native=False, out=None):
+    """
+    Compiles a source file
+    """
     cmd = [compiler, '-O%d' % olevel]
 
     if out is None:
@@ -41,8 +45,24 @@ def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, nati
     cmd.extend(['-o', out])
     cmd.append(source)
 
-    print "Compiling %s..." % source
-    if subprocess.call(cmd):
-        raise RuntimeError("Error when compiling: %s" % source)
+    print "Compiling %s with %s" % (source, ' '.join(cmd))
+    if subprocess.call(cmd, stderr=open('/dev/null')):
+        if native:
+            print 'warning: native compilation is not supported'
+            print 'Retrying without native option...'
+            compile(source, compiler=compiler, olevel=olevel, debug=debug, profiling=profiling, native=False, out=out)
+        else:
+            raise RuntimeError("Error when compiling: %s" % source)
 
     return out
+
+@argument('source', help='Source file to prepare')
+def prepare(source):
+    """
+    Generates the common used executables for benchmarking
+    """
+    return [
+        compile(source, olevel=0),
+        compile(source, olevel=1),
+        compile(source, olevel=3, native=True)
+    ]
