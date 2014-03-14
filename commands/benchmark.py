@@ -1,11 +1,11 @@
 """
 Benchmark commands
 """
-import difflib
 import os
 import subprocess
 import sys
 import time
+from core.utils import generate_graphs, swap_ext
 from reticular import argument, global_arg, say
 from base import compile
 
@@ -31,11 +31,23 @@ def full(original, optimized=None, **kwargs):
 
     if optimized:
         optimized = compile(optimized, olevel=3)
-        diff(original, optimized, **kwargs)
+
+    exe(original, optimized)
+
+
+def exe(original, optimized=None, **kwargs):
+    """
+    Checks differences and generates stats and graphs.
+    """
+    if not optimized:
+        return stats(original, **kwargs)
+
+    diff(original, optimized, **kwargs)
+
+    generate_graphs(os.path.splitext(original)[0], [
+        stats(original, **kwargs),
         stats(optimized, **kwargs)
-
-    stats(original, **kwargs)
-
+    ])
 
 @argument('executable', help='Executable file')
 @argument('-q', '--quiet', help="Don't print the stats table", action='store_true')
@@ -44,11 +56,12 @@ def stats(executable, quiet=False, executions=1, **kwargs):
     Generates stats with the real time
     """
     name, ext = os.path.splitext(executable)
+    filename = "%s.stats" % name
 
     say("Generating stats for %s..." % executable)
-    with open("%s.stats" % name, 'w') as f:
+    with open(filename, 'w') as f:
         def _stats(i, *args):
-            times = [run(executable, args=args, output=False)[2] for _ in xrange(executions)]
+            times = [run(executable, args=args)[2] for _ in xrange(executions)]
             row_id = args[0] if args else i
             row = "%d %.4f\n" % (row_id, sum(times)/executions)
             f.write(row)
@@ -57,6 +70,8 @@ def stats(executable, quiet=False, executions=1, **kwargs):
                 sys.stdout.write(row)
 
         for_each_case(_stats, **kwargs)
+
+    return filename
 
 
 @argument('original', help='Original executable')
@@ -69,15 +84,25 @@ def diff(original, candidate, **kwargs):
     say("Checking differences between %s and %s..." % (original, candidate))
 
     def _diff(i, *args):
-        out1, _, _ = run(original, args=args)
-        out2, _, _ = run(candidate, args=args)
+        say("Checking iteration %d with args %s..." % (i, args))
 
-        differences = ''.join(difflib.unified_diff(out1, out2))
+        out1, _, _ = run(original, args=args, output=True)
+        out2, _, _ = run(candidate, args=args, output=True)
 
-        if differences:
-            print "Showing differences with args: %s" % args
-            print differences
+        file_original = swap_ext(original, 'out')
+        file_candidate = swap_ext(candidate, 'out')
+
+        with open(file_original, 'w') as f:
+            f.write(out1)
+
+        with open(file_candidate, 'w') as f:
+            f.write(out2)
+
+        if subprocess.call(['diff', '-u', file_original, file_candidate]):
             raise RuntimeError("Differences detected!")
+
+        os.remove(file_original)
+        os.remove(file_candidate)
 
     for_each_case(_diff, **kwargs)
 
@@ -91,7 +116,7 @@ def for_each_case(f, arg=None, cases=20, **kwargs):
         f(i, *args)
 
 
-def run(exe, args=None, output=True):
+def run(exe, args=None, output=False):
     if args is None:
         args = []
 

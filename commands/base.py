@@ -46,7 +46,7 @@ def compile(source, compiler='gcc', olevel=0, debug=False, profiling=False, nati
     cmd.append(source)
 
     say("Compiling %s with %s" % (source, ' '.join(cmd)))
-    if subprocess.call(cmd, stderr=open('/dev/null')):
+    if subprocess.call(cmd):
         if native:
             print 'warning: native compilation is not supported'
             print 'Retrying without native option...'
