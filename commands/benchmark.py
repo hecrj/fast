@@ -16,8 +16,8 @@ ARGUMENTS = [
 ]
 
 
-@argument('original', help='Original source file')
 @argument('optimized', help='Optimized source file', nargs='?')
+@argument('original', help='Original source file')
 def full(original, optimized=None, **kwargs):
     """
     Compiles, checks differences and generates stats and graphs
