@@ -32,7 +32,7 @@ def full(original, optimized=None, **kwargs):
     if optimized:
         optimized = compile(optimized, olevel=3)
 
-    exe(original, optimized)
+    exe(original, optimized, **kwargs)
 
 
 def exe(original, optimized=None, **kwargs):
