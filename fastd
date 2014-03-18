@@ -1,0 +1,4 @@
+#!/usr/bin/env python
+from fast.base import console
+
+console()

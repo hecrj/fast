@@ -4,35 +4,16 @@ Benchmark commands
 import os
 import subprocess
 import sys
-import time
-from core.utils import generate_graphs, swap_ext
 from reticular import argument, global_arg, say
-from base import compile
+from fast.utils import generate_graphs, for_each_case, run, swap_ext
 
 ARGUMENTS = [
-    global_arg('-a', '--arg', help='Defines an argument to pass to the executable', action='append', default=[]),
     global_arg('-c', '--cases', help='Number of cases (default: %(default)s)', default=20, type=int),
     global_arg('-e', '--executions', help='Number of executions per case (default: %(default)s)', default=1)
 ]
 
 
-@argument('optimized', help='Optimized source file', nargs='?')
-@argument('original', help='Original source file')
-def full(original, optimized=None, **kwargs):
-    """
-    Compiles, checks differences and generates stats and graphs
-    """
-    for prog_file in [original, optimized]:
-        if prog_file:
-            if not os.path.isfile(prog_file):
-                raise RuntimeError('File not found: %s' % prog_file)
 
-    original = compile(original, olevel=3)
-
-    if optimized:
-        optimized = compile(optimized, olevel=3)
-
-    exe(original, optimized, **kwargs)
 
 
 def exe(original, optimized=None, **kwargs):
@@ -105,32 +86,3 @@ def diff(original, candidate, **kwargs):
         os.remove(file_candidate)
 
     for_each_case(_diff, **kwargs)
-
-
-def for_each_case(f, arg=None, cases=20, **kwargs):
-    if arg is None:
-        arg = []
-
-    for i in xrange(1, cases+1):
-        args = [eval(a) for a in arg]
-        f(i, *args)
-
-
-def run(exe, args=None, output=False):
-    if args is None:
-        args = []
-
-    stdout = subprocess.PIPE if output else open('/dev/null')
-
-    cmd = ["./%s" % exe]
-    cmd.extend(map(str, args))
-
-    start = time.time()
-    process = subprocess.Popen(cmd, stdout=stdout, stderr=subprocess.PIPE)
-    out, err = process.communicate()
-    elapsed = time.time() - start
-
-    if process.returncode:
-        raise RuntimeError("Error when executing %s with args: %s" % (exe, args))
-
-    return out, err, elapsed
