@@ -28,24 +28,23 @@ class BenchmarkBase(object):
         return input
 
     def full(self):
-        say("Benchmarking %s..." % self.name)
-        self.diff()
+        with say("Benchmarking %s..." % self.name):
+            self.diff()
 
     def diff(self):
-        say("Checking differences between %s and %s..." % (self.original, self.optimized))
-        self.for_each_case(self._diff)
+        with say("Checking differences between %s and %s..." % (self.original, self.optimized)):
+            self.for_each_case(self._diff)
 
     def _diff(self, input):
-        say("Checking case with label %s..." % input.label)
+        with say("Checking case with label %s..." % input.label):
+            out_original, _ = self.original.run(input, save_output=True)
+            out_optimized, _ = self.optimized.run(input, save_output=True)
 
-        out_original, _ = self.original.run(input, save_output=True)
-        out_optimized, _ = self.optimized.run(input, save_output=True)
+            if subprocess.call(['diff', '-u', out_original.filename, out_optimized.filename]):
+                raise RuntimeError("Differences detected!")
 
-        if subprocess.call(['diff', '-u', out_original.filename, out_optimized.filename]):
-            raise RuntimeError("Differences detected!")
-
-        out_original.remove()
-        out_optimized.remove()
+            out_original.remove()
+            out_optimized.remove()
 
     def for_each_case(self, function):
         for case in xrange(1, self.cases+1):

@@ -20,9 +20,9 @@ def make(name):
     original = Executable("%s.3" % name)
     optimized = Executable("%s_fast.3" % name)
 
-    say("Making executables...")
-    original.make()
-    optimized.make()
+    with say("Making executables..."):
+        original.make()
+        optimized.make()
 
     return original, optimized
 
