@@ -2,42 +2,22 @@
 A command-line tool to test the optimizations performed to a program
 """
 import os
-from reticular import argument, say, global_arg, command
+from reticular import argument, say, command
 from fast.benchmarks import load_benchmarks
-from fast.files import Executable
-
-
-ARGUMENTS = (
-    global_arg('name', help='Program name to benchmark'),
-)
 
 
 @command
-def make(name):
-    """
-    Use Makefile to make program executables
-    """
-    original = Executable("%s.3" % name)
-    optimized = Executable("%s_fast.3" % name)
-
-    with say("Making executables..."):
-        original.make()
-        optimized.make()
-
-    return original, optimized
-
-
-@command
-def benchmark(name):
+def benchmark():
     """
     Performs benchmarks to the specified program
     """
-    original, optimized = make(name)
     benchmarks = load_benchmarks()
 
     for benchmark_class in benchmarks.values():
-        bmark = benchmark_class(original=original, optimized=optimized)
+        bmark = benchmark_class()
         bmark.full()
+
+    say('Done.')
 
 
 @argument('-s', '--stats', help='Clean .stats files', action='store_true')
