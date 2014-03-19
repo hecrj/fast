@@ -6,16 +6,21 @@ from reticular import argument, say, command
 from fast.benchmarks import load_benchmarks
 
 
-@command
-def benchmark():
+@argument('--no-diffs', dest='check_diffs', help='Disable difference check', action='store_false')
+@argument('names', help='Names of the benchmarks to perform', action='append', nargs='?')
+def benchmark(names, check_diffs):
     """
     Performs benchmarks to the specified program
     """
     benchmarks = load_benchmarks()
 
-    for benchmark_class in benchmarks.values():
-        bmark = benchmark_class()
-        bmark.full()
+    if not any(names):
+        names = 'all'
+
+    for name, benchmark_class in benchmarks.iteritems():
+        if names == 'all' or name in names:
+            bmark = benchmark_class()
+            bmark.full(check_diffs=check_diffs)
 
     say('Done.')
 
@@ -25,7 +30,7 @@ def clean(stats):
     """
     Cleans fast-generated files of the current directory
     """
-    ends = ['.exe']
+    ends = ['.in', '.out']
 
     if stats:
         ends.append('.stats')

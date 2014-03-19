@@ -1,17 +1,17 @@
 import subprocess
 from reticular import say
 from fast.files import Input, Output, Executable
-from fast.utils import gnuplot
+from fast.utils import gnuplot, normalize_camel_case
 
 _BENCHMARKS = {}
 
 
 class Stats(object):
-    def __init__(self, name, original, optimized, input_label="Input"):
+    def __init__(self, name, original, optimized, xlabel="Input"):
         self.name = name
         self.original = original
         self.optimized = optimized
-        self.input_label = input_label
+        self.xlabel = xlabel
 
     def generate_graphs(self):
         if subprocess.call(['which', 'gnuplot'], stdout=open('/dev/null', 'w')):
@@ -23,10 +23,10 @@ class Stats(object):
             self.generate_speedup()
 
     def generate_times(self):
-        say('Generating graph: %s vs Time (s)' % self.input_label)
+        say('Generating graph: %s vs Time (s)' % self.xlabel)
         gnuplot([
             'set ylabel "Time (s)"',
-            'set xlabel "%s"' % self.input_label,
+            'set xlabel "%s"' % self.xlabel,
             "set term pdf color",
             'set output "%s_time.pdf"' % self.name,
             "plot '%s' title '%s' pt 1, '%s' title '%s' pt 12" % (self.original, self.original.executable,
@@ -37,7 +37,7 @@ class Stats(object):
         say("Generating graph: Speedup")
         gnuplot([
             'set ylabel "Speedup"',
-            'set xlabel "%s"' % self.input_label,
+            'set xlabel "%s"' % self.xlabel,
             "set term pdf color",
             'set output "%s_speedup.pdf"' % self.name,
             "plot '< paste %s %s' using 1:($2/$4) title '%s/%s' lc 3 pt 12" % (self.original, self.optimized,
@@ -51,11 +51,12 @@ class BenchmarkBase(object):
     target = None
     cases = 20
     executions = 1
-    input_label = "Input"
+    xlabel = "Input"
     stats_class = Stats
 
     def __init__(self):
         self.original, self.optimized = self.make()
+        self._inputs = []
 
     def make(self):
         if self.target is None:
@@ -70,31 +71,50 @@ class BenchmarkBase(object):
 
         return original, optimized
 
+    def args(self, case):
+        return []
+
     def input(self, case):
-        raise NotImplementedError
+        raise RuntimeError("input() not implemented in benchmark %s" % self.name)
 
     def label(self, case):
         return case
 
     def generate_input(self, case):
-        input = Input(benchmark=self.name, label=self.label(case))
+        input = Input(benchmark=self.name, label=self.label(case), args=self.args(case),
+                      constant=hasattr(self.input, 'constant'))
 
-        with input.open('w') as f:
-            f.write(self.input(case))
+        if not input.constant or len(self._inputs) == 0:
+            with say("Generating input %s..." % input), input.open('w') as f:
+                f.write(self.input(case))
 
         return input
 
     def inputs(self):
-        for case in xrange(1, self.cases + 1):
-            input = self.generate_input(case)
-            yield input
+        for case in xrange(1, self.cases+1):
+            try:
+                self._inputs[case-1]
+            except IndexError:
+                self._inputs.append(self.generate_input(case))
+
+            yield self._inputs[case-1]
+
+    def full(self, check_diffs=True):
+        with say("Benchmarking %s..." % self.name):
+            try:
+                if check_diffs:
+                    self.check_differences()
+
+                stats = self.generate_stats()
+                stats.generate_graphs()
+            finally:
+                self.clean()
+
+    def clean(self):
+        for input in self.inputs():
             input.remove()
 
-    def full(self):
-        with say("Benchmarking %s..." % self.name):
-            self.check_differences()
-            stats = self.generate_stats()
-            stats.generate_graphs()
+        self._inputs = []
 
     def check_differences(self):
         with say("Checking differences between %s and %s..." % (self.original, self.optimized)):
@@ -102,7 +122,7 @@ class BenchmarkBase(object):
                 self.diff(input)
 
     def diff(self, input):
-        with say("Checking input with label %s..." % input.label):
+        with say("Checking input %s with args %s..." % (input, input.args)):
             out_original, _ = self.original.run(input, save_output=True)
             out_optimized, _ = self.optimized.run(input, save_output=True)
 
@@ -115,7 +135,7 @@ class BenchmarkBase(object):
     def generate_stats(self):
         return self.stats_class(
             name=self.name,
-            input_label=self.input_label,
+            xlabel=self.xlabel,
             original=self._generate_stats(self.original),
             optimized=self._generate_stats(self.optimized)
         )
@@ -125,6 +145,7 @@ class BenchmarkBase(object):
 
         with say("Generating stats for %s..." % executable), stats_file.open('w') as f:
             for input in self.inputs():
+                say("Timing input %s with args %s..." % (input, input.args))
                 time = executable.average(input, self.executions)
                 row = "%d %.4f\n" % (input.label, time)
                 f.write(row)
@@ -133,11 +154,15 @@ class BenchmarkBase(object):
 
 
 def benchmark(cls):
-    if not cls.name:
-        raise RuntimeError("Some benchmark has not a valid name")
+    cls.name = normalize_camel_case(cls.__name__).replace('_benchmark', '')
 
     _BENCHMARKS[cls.name] = cls
     return cls
+
+
+def constant(f):
+    f.constant = True
+    return f
 
 
 def load_benchmarks():

@@ -12,29 +12,35 @@ class File(object):
         return open(self.filename, flag)
 
     def remove(self):
-        os.remove(self.filename)
+        try:
+            os.remove(self.filename)
+        except OSError:
+            pass
 
     def __repr__(self):
         return self.filename
 
 
 class BenchmarkFile(File):
-    def __init__(self, benchmark, label, extension='.txt'):
-        super(BenchmarkFile, self).__init__("%s_%s%s" % (benchmark, label, extension))
+    def __init__(self, benchmark, label, extension='.txt', constant=False):
+        filename = "%s.in" % benchmark if constant else "%s_%s%s" % (benchmark, label, extension)
+        super(BenchmarkFile, self).__init__(filename)
         self.benchmark = benchmark
         self.label = label
+        self.constant = constant
 
 
 class Input(BenchmarkFile):
-    def __init__(self, benchmark, label, extension='.in'):
-        super(Input, self).__init__(benchmark, label, extension)
+    def __init__(self, benchmark, label, args, extension='.in', constant=False):
+        super(Input, self).__init__(benchmark, label, extension, constant=constant)
+        self.args = args
 
 
 class Output(BenchmarkFile):
     def __init__(self, executable, benchmark, label, extension='.out'):
         super(Output, self).__init__(benchmark, label, extension)
         self.executable = executable
-        self.filename = "%s_%s" % (executable, self.filename)
+        self.filename = "%s_%s" % (executable.name, self.filename)
 
 
 class Executable(File):
@@ -52,6 +58,7 @@ class Executable(File):
         stdout = output.open('w') if save_output else open('/dev/null', 'w')
 
         cmd = ["./%s" % self.filename]
+        cmd.extend([str(arg) for arg in input.args])
 
         start = time.time()
         returncode = subprocess.call(cmd, stdin=stdin, stdout=stdout, stderr=subprocess.PIPE)
