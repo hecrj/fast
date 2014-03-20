@@ -1,61 +1,69 @@
+from itertools import cycle
 import subprocess
 from reticular import say
 from fast.files import Input, Output, Executable
 from fast.utils import gnuplot, normalize_camel_case
 
-_BENCHMARKS = {}
-
 
 class Stats(object):
-    def __init__(self, name, original, optimized, xlabel="Input"):
+    POINTS = [1, 12, 2, 3, 4, 5]
+    COLORS = [3, 2, 4, 5]
+
+    def __init__(self, name, files, xlabel="Input"):
         self.name = name
-        self.original = original
-        self.optimized = optimized
+        self.files = files
         self.xlabel = xlabel
 
-    def generate_graphs(self):
+    def generate_plots(self):
         if subprocess.call(['which', 'gnuplot'], stdout=open('/dev/null', 'w')):
-            say("Gnuplot not found. Skipping graph generation...")
+            say("Gnuplot not found. Skipping plot generation...")
             return
 
-        with say("Generating graphs for %s..." % self.name):
+        with say("Generating plots for %s..." % self.name):
             self.generate_times()
             self.generate_speedup()
 
     def generate_times(self):
-        say('Generating graph: %s vs Time (s)' % self.xlabel)
+        say('Generating plot: %s vs Time (s)' % self.xlabel)
+        plots = ["'%s' title '%s' pt %d" % (f, f.executable, pt) for f, pt in zip(self.files, cycle(self.POINTS))]
         gnuplot([
             'set ylabel "Time (s)"',
             'set xlabel "%s"' % self.xlabel,
+            'set key below',
             "set term pdf color",
             'set output "%s_time.pdf"' % self.name,
-            "plot '%s' title '%s' pt 1, '%s' title '%s' pt 12" % (self.original, self.original.executable,
-                                                                  self.optimized, self.optimized.executable)
+            "plot %s" % ', '.join(plots)
         ])
 
     def generate_speedup(self):
-        say("Generating graph: Speedup")
+        if len(self.files) < 2:
+            return say("Too few stats. Skipping speedup plot...")
+
+        original = self.files[0]
+        plots = ["'< paste %s %s' using 1:($2/$4) title '%s/%s' lc %d" % (original, f, original.executable, f.executable,
+                                                                          color)
+                 for f, color in zip(self.files[1:], cycle(self.COLORS))]
+        say("Generating plot: Speedup")
         gnuplot([
             'set ylabel "Speedup"',
             'set xlabel "%s"' % self.xlabel,
+            'set key below',
             "set term pdf color",
             'set output "%s_speedup.pdf"' % self.name,
-            "plot '< paste %s %s' using 1:($2/$4) title '%s/%s' lc 3 pt 12" % (self.original, self.optimized,
-                                                                               self.original.executable,
-                                                                               self.optimized.executable)
+            "plot %s" % ', '.join(plots)
         ])
 
 
 class BenchmarkBase(object):
     name = None
     target = None
-    cases = 20
+    instances = 20
     executions = 1
     xlabel = "Input"
     stats_class = Stats
 
     def __init__(self):
-        self.original, self.optimized = self.make()
+        self.original, self.optimized = None, None
         self._inputs = []
 
     def make(self):
@@ -71,42 +79,42 @@ class BenchmarkBase(object):
 
         return original, optimized
 
-    def args(self, case):
+    def args(self, instance):
         return []
 
-    def input(self, case):
+    def input(self, instance):
         raise RuntimeError("input() not implemented in benchmark %s" % self.name)
 
-    def label(self, case):
-        return case
+    def label(self, instance):
+        return instance
 
-    def generate_input(self, case):
-        input = Input(benchmark=self.name, label=self.label(case), args=self.args(case),
-                      constant=hasattr(self.input, 'constant'))
+    def generate_input(self, instance):
+        input = Input(benchmark=self.name, label=self.label(instance), args=self.args(instance))
 
-        if not input.constant or len(self._inputs) == 0:
-            with say("Generating input %s..." % input), input.open('w') as f:
-                f.write(self.input(case))
+        with input.open('w') as f:
+            f.write(self.input(instance))
 
         return input
 
     def inputs(self):
-        for case in xrange(1, self.cases+1):
+        for instance in xrange(1, self.instances+1):
             try:
-                self._inputs[case-1]
+                self._inputs[instance-1]
             except IndexError:
-                self._inputs.append(self.generate_input(case))
+                self._inputs.append(self.generate_input(instance))
 
-            yield self._inputs[case-1]
+            yield self._inputs[instance-1]
 
     def full(self, check_diffs=True):
+        self.original, self.optimized = self.make()
+
         with say("Benchmarking %s..." % self.name):
             try:
                 if check_diffs:
                     self.check_differences()
 
                 stats = self.generate_stats()
-                stats.generate_graphs()
+                stats.generate_plots()
             finally:
                 self.clean()
 
@@ -136,33 +144,29 @@ class BenchmarkBase(object):
         return self.stats_class(
             name=self.name,
             xlabel=self.xlabel,
-            original=self._generate_stats(self.original),
-            optimized=self._generate_stats(self.optimized)
+            files=[self._generate_stats(self.original), self._generate_stats(self.optimized)]
         )
 
     def _generate_stats(self, executable):
-        stats_file = Output(executable=executable, benchmark=self.name, label=self.cases, extension='.stats')
+        stats_file = Output(executable=executable, benchmark=self.name, label=self.instances, extension='.stats')
 
         with say("Generating stats for %s..." % executable), stats_file.open('w') as f:
+            say("%s%s" % (self.xlabel.ljust(20), "Time (s)"))
             for input in self.inputs():
-                say("Timing input %s with args %s..." % (input, input.args))
                 time = executable.average(input, self.executions)
-                row = "%d %.4f\n" % (input.label, time)
-                f.write(row)
+                f.write("%d %.4f\n" % (input.label, time))
+                say("%s%.4f" % (str(input.label).ljust(20), time))
 
         return stats_file
 
 
+_BENCHMARKS = []
+
+
 def benchmark(cls):
     cls.name = normalize_camel_case(cls.__name__).replace('_benchmark', '')
-
-    _BENCHMARKS[cls.name] = cls
+    _BENCHMARKS.append(cls)
     return cls
-
-
-def constant(f):
-    f.constant = True
-    return f
 
 
 def load_benchmarks():
@@ -171,3 +175,13 @@ def load_benchmarks():
         return _BENCHMARKS
     except ImportError:
         raise RuntimeError("No module named benchmarks.py in the current directory.")
+
+
+def get_benchmark(name):
+    benchmarks = load_benchmarks()
+
+    for bmark in benchmarks:
+        if bmark.name == name:
+            return bmark
+
+    raise RuntimeError("Benchmark with name %s not found" % name)

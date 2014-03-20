@@ -22,17 +22,15 @@ class File(object):
 
 
 class BenchmarkFile(File):
-    def __init__(self, benchmark, label, extension='.txt', constant=False):
-        filename = "%s.in" % benchmark if constant else "%s_%s%s" % (benchmark, label, extension)
-        super(BenchmarkFile, self).__init__(filename)
+    def __init__(self, benchmark, label, extension='.txt'):
+        super(BenchmarkFile, self).__init__("%s_%s%s" % (benchmark, label, extension))
         self.benchmark = benchmark
         self.label = label
-        self.constant = constant
 
 
 class Input(BenchmarkFile):
     def __init__(self, benchmark, label, args, extension='.in', constant=False):
-        super(Input, self).__init__(benchmark, label, extension, constant=constant)
+        super(Input, self).__init__(benchmark, label, extension)
         self.args = args
 
 

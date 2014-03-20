@@ -3,7 +3,7 @@ A command-line tool to test the optimizations performed to a program
 """
 import os
 from reticular import argument, say, command
-from fast.benchmarks import load_benchmarks
+from fast.benchmarks import load_benchmarks, get_benchmark
 
 
 @argument('--no-diffs', dest='check_diffs', help='Disable difference check', action='store_false')
@@ -17,12 +17,26 @@ def benchmark(names, check_diffs):
     if not any(names):
         names = 'all'
 
-    for name, benchmark_class in benchmarks.iteritems():
-        if names == 'all' or name in names:
+    for benchmark_class in benchmarks:
+        if names == 'all' or benchmark_class.name in names:
             bmark = benchmark_class()
             bmark.full(check_diffs=check_diffs)
 
     say('Done.')
+
+
+@argument('instances', help='Instances of the inputs to generate', action='append', type=int, nargs='?')
+@argument('name', help='Name of the benchmark to generate input')
+def generate(name, instances):
+    if not any(instances):
+        instances = [1]
+
+    bmark = get_benchmark(name)()
+
+    for instance in instances:
+        with say("Generating input for instance %d..." % instance):
+            input = bmark.generate_input(instance)
+            say("Generated: %s" % input)
 
 
 @argument('-s', '--stats', help='Clean .stats files', action='store_true')
