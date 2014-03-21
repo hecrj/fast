@@ -38,7 +38,7 @@ class Output(BenchmarkFile):
     def __init__(self, executable, benchmark, label, extension='.out'):
         super(Output, self).__init__(benchmark, label, extension)
         self.executable = executable
-        self.filename = "%s_%s" % (executable.name, self.filename)
+        self.filename = "%s_%s_%s" % (executable.name, executable.extension, self.filename)
 
 
 class Executable(File):
