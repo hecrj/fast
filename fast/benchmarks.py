@@ -57,6 +57,7 @@ class Stats(object):
 class BenchmarkBase(object):
     name = None
     target = None
+    executables = None
     instances = 20
     executions = 1
     xlabel = "Input"
@@ -68,10 +69,13 @@ class BenchmarkBase(object):
 
     def make(self):
         if self.target is None:
-            raise RuntimeError("No target defined in benchmark: %s" % self.name)
+            if self.executables is None:
+                raise RuntimeError("No target/executables defined in benchmark: %s" % self.name)
 
-        original = Executable("%s" % self.target)
-        optimized = Executable("%s_fast%s" % (original.name, original.extension))
+            original, optimized = Executable(self.executables[0]), Executable(self.executables[1])
+        else:
+            original = Executable("%s" % self.target)
+            optimized = Executable("%s_fast%s" % (original.name, original.extension))
 
         with say("Making executables..."):
             original.make()
