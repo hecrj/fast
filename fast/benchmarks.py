@@ -57,31 +57,40 @@ class Stats(object):
 class BenchmarkBase(object):
     name = None
     target = None
-    executables = None
+    candidates = None
     instances = 20
     executions = 1
     xlabel = "Input"
     stats_class = Stats
 
     def __init__(self):
-        self.original, self.optimized = None, None
         self._inputs = []
+        self._original = None
+        self._candidates = []
 
     def make(self):
         if self.target is None:
-            if self.executables is None:
-                raise RuntimeError("No target/executables defined in benchmark: %s" % self.name)
+            raise RuntimeError("No target executable defined in benchmark: %s" % self.name)
 
-            original, optimized = Executable(self.executables[0]), Executable(self.executables[1])
-        else:
-            original = Executable("%s" % self.target)
-            optimized = Executable("%s_fast%s" % (original.name, original.extension))
+        self._original = Executable(self.target)
+
+        if self.candidates is None:
+            self.candidates = ["%s_fast%s" % (self._original.name, self._original.extension)]
+
+        try:
+            iter(self.candidates)
+        except TypeError:
+            self.candidates = [self.candidates]
+
+        self._candidates = [Executable(candidate) for candidate in self.candidates]
 
         with say("Making executables..."):
-            original.make()
-            optimized.make()
+            self._original.make()
 
-        return original, optimized
+            for candidate in self._candidates:
+                candidate.make()
+
+        return self._original, self._candidates
 
     def args(self, instance):
         return []
@@ -110,7 +119,7 @@ class BenchmarkBase(object):
             yield self._inputs[instance-1]
 
     def full(self, check_diffs=True):
-        self.original, self.optimized = self.make()
+        self.make()
 
         with say("Benchmarking %s..." % self.name):
             try:
@@ -129,26 +138,30 @@ class BenchmarkBase(object):
         self._inputs = []
 
     def check_differences(self):
-        with say("Checking differences between %s and %s..." % (self.original, self.optimized)):
-            for input in self.inputs():
-                self.diff(input)
+        for candidate in self._candidates:
+            with say("Checking differences between %s and %s..." % (self._original, candidate)):
+                for input in self.inputs():
+                    self.diff(input, candidate)
 
-    def diff(self, input):
+    def diff(self, input, candidate):
         with say("Checking input %s with args %s..." % (input, input.args)):
-            out_original, _ = self.original.run(input, save_output=True)
-            out_optimized, _ = self.optimized.run(input, save_output=True)
+            out_original, _ = self._original.run(input, save_output=True)
+            out_candidate, _ = candidate.run(input, save_output=True)
 
-            if subprocess.call(['diff', '-u', out_original.filename, out_optimized.filename]):
+            if subprocess.call(['diff', '-u', out_original.filename, out_candidate.filename]):
                 raise RuntimeError("Differences detected!")
 
             out_original.remove()
-            out_optimized.remove()
+            out_candidate.remove()
 
     def generate_stats(self):
+        files = [self._generate_stats(self._original)]
+        files.extend([self._generate_stats(candidate) for candidate in self._candidates])
+
         return self.stats_class(
             name=self.name,
             xlabel=self.xlabel,
-            files=[self._generate_stats(self.original), self._generate_stats(self.optimized)]
+            files=files
         )
 
     def _generate_stats(self, executable):
