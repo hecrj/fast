@@ -8,7 +8,7 @@ except ImportError:
 setup(
     name="fast-cli",
     packages=["fast", "fast.commands"],
-    version="0.0.4",
+    version="0.0.5",
     description="Command-line tool to test the optimizations performed to a program",
     author="Héctor Ramón Jiménez, and Alvaro Espuña Buxo",
     author_email="hector0193@gmail.com",
