@@ -110,7 +110,7 @@ class BenchmarkBase(object):
         return input
 
     def inputs(self):
-        for instance in xrange(1, self.instances+1):
+        for instance in range(1, self.instances+1):
             try:
                 self._inputs[instance-1]
             except IndexError:

@@ -68,5 +68,5 @@ class Executable(File):
         return output, elapsed
 
     def average(self, input, executions):
-        times = [self.run(input, save_output=False)[1] for _ in xrange(executions)]
+        times = [self.run(input, save_output=False)[1] for _ in range(executions)]
         return sum(times)/executions

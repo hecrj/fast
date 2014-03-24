@@ -2,7 +2,7 @@
 A command-line tool to test the optimizations performed to a program
 """
 import os
-from reticular import argument, say, command
+from reticular import argument, say
 from fast.benchmarks import load_benchmarks, get_benchmark
 
 
