@@ -23,7 +23,7 @@ setup(
 fast is a command-line tool to test the optimizations performed to a program.
 """,
     install_requires=[
-        'reticular == 0.0.6'
+        'reticular == 0.0.7'
     ],
     entry_points={
         'console_scripts': ['fast = fast.base:console']
