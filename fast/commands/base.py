@@ -6,6 +6,24 @@ from reticular import argument, say
 from fast.benchmarks import load_benchmarks, get_benchmark
 
 
+@argument('names', help='Names of the benchmarks to perform', action='append', nargs='?')
+def checkpoint(names):
+    """
+    Creates a checkpoint for the current targets
+    """
+    benchmarks = load_benchmarks()
+
+    if not any(names):
+        names = 'all'
+
+    for benchmark_class in benchmarks:
+        if names == 'all' or benchmark_class.name in names:
+            bmark = benchmark_class()
+            bmark.checkpoint()
+
+    say('Done.')
+
+
 @argument('--no-diffs', dest='check_diffs', help='Disable difference check', action='store_false')
 @argument('names', help='Names of the benchmarks to perform', action='append', nargs='?')
 def benchmark(names, check_diffs):

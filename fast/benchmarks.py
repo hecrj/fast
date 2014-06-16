@@ -118,6 +118,15 @@ class BenchmarkBase(object):
 
             yield self._inputs[instance-1]
 
+    def checkpoint(self):
+        self.make()
+
+        with say("Checkpoint %s..." % self.name):
+            try:
+                self._generate_stats(self._original)
+            finally:
+                self.clean()
+
     def full(self, check_diffs=True):
         self.make()
 
@@ -155,7 +164,12 @@ class BenchmarkBase(object):
             out_candidate.remove()
 
     def generate_stats(self):
-        files = [self._generate_stats(self._original)]
+        original_stat = Output(self._original, benchmark=self.name, label=self.instances, extension='.stats')
+
+        if not original_stat.exists():
+            raise RuntimeError("Original stats file for benchmark %s does not exist. Run checkpoint first." % self.name)
+
+        files = [original_stat]
         files.extend([self._generate_stats(candidate) for candidate in self._candidates])
 
         return self.stats_class(

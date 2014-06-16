@@ -20,6 +20,9 @@ class File(object):
     def __repr__(self):
         return self.filename
 
+    def exists(self):
+        return os.path.isfile(self.filename)
+
 
 class BenchmarkFile(File):
     def __init__(self, benchmark, label, extension='.txt'):
