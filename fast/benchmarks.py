@@ -58,6 +58,7 @@ class BenchmarkBase(object):
     name = None
     target = None
     candidates = None
+    diff_script = None
     instances = 20
     executions = 1
     xlabel = "Input"
@@ -147,10 +148,15 @@ class BenchmarkBase(object):
         self._inputs = []
 
     def check_differences(self):
-        for candidate in self._candidates:
-            with say("Checking differences between %s and %s..." % (self._original, candidate)):
-                for input in self.inputs():
-                    self.diff(input, candidate)
+        if self.diff_script is None:
+            for candidate in self._candidates:
+                with say("Checking differences between %s and %s..." % (self._original, candidate)):
+                    for input in self.inputs():
+                        self.diff(input, candidate)
+        else:
+            with say("Executing differences script: %s" % self.diff_script):
+                if subprocess.call(["./%s" % self.diff_script]):
+                    raise RuntimeError("Differences detected!")
 
     def diff(self, input, candidate):
         with say("Checking input %s with args %s..." % (input, input.args)):
